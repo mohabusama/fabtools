@@ -17,10 +17,15 @@ from fabric.api import (
 )
 from fabric.colors import red
 
-from fabtools.deb import is_installed
+from fabtools.deb import is_installed as is_deb_installed
+from fabtools.rpm import is_installed as is_rpm_installed
+from fabtools.arch import is_installed as is_arch_installed
 from fabtools.files import is_link
 from fabtools.nginx import disable, enable
-from fabtools.require.deb import package
+from fabtools.require.deb import package as require_deb_package
+from fabtools.require.rpm import package as require_rpm_package
+from fabtools.require.arch import package as require_arch_package
+from fabtools.system import distrib_family, distrib_id
 from fabtools.require.files import template_file
 from fabtools.require.service import started as require_started
 from fabtools.service import reload as reload_service
@@ -41,7 +46,15 @@ def server(package_name='nginx'):
         require.nginx.server()
 
     """
-    package(package_name)
+    family = distrib_family()
+
+    if family == 'debian':
+        require_deb_package(package_name)
+    elif family == 'redhat':
+        require_rpm_package(package_name)
+    elif distrib_id() is 'Archlinux':
+        require_arch_package(package_name)
+
     require_started('nginx')
 
 
@@ -109,8 +122,14 @@ def site(server_name, template_contents=None, template_source=None,
 
     .. seealso:: :py:func:`fabtools.require.files.template_file`
     """
-    if not is_installed('nginx-common'):
-        # nginx-common is always installed if nginx exists
+    family = distrib_family()
+
+    # nginx-common is always installed if nginx exists
+    if family == 'debian' and not is_deb_installed('nginx-common'):
+        server()
+    elif family == 'redhat' and not is_rpm_installed('nginx-common'):
+        server()
+    elif distrib_id() is 'Archlinux' and not is_arch_installed('nginx-common'):
         server()
 
     config_filename = '/etc/nginx/sites-available/%s.conf' % server_name
